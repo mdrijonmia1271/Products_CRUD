@@ -1,26 +1,32 @@
 <?php
 
-
-
-
 $pdo = new PDO('mysql:host=localhost;port=3306;dbname=products_crud','root','');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-//echo '<pre>';
-//var_dump($_FILES);
-//echo '</pre>';
+$id = $_GET['id'] ?? null;
+if (!$id){
+    header('Location: index.php');
+    exit();
+}
+$statement = $pdo->prepare('SELECT * FROM products WHERE id = :id');
+$statement->bindValue(':id', $id);
+$statement->execute();
+$product = $statement->fetch(PDO::FETCH_ASSOC);
 
+//echo '<pre>';
+//var_dump($product);
+//echo '</pre>';
+//exit();
 
 //echo $_SERVER['REQUEST_METHOD'];
 $errors = [];
-$title = '';
-$description = '';
-$price = '';
+$title = $product['title'];
+$description = $product['description'];
+$price = $product['price'];
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $title = $_POST['title'];
     $description = $_POST['description'];
     $price = $_POST['price'];
-    $date = date('Y-m-d H:i:s');
 
     if(!$title){
         $errors [] = 'Product title is required';
@@ -34,19 +40,25 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
 
     if(empty($errors)){
         $image = $_FILES ['image'] ?? null;
-        $imagePath = '';
+        $imagePath = $product['image'];
+
+
         if ($image && $image['tmp_name']){
+
+            if ($product['image']){
+                unlink($product['image']);
+            }
             $imagePath = 'images/'.randomString(8).'/'.$image['name'];
             mkdir(dirname($imagePath));
             move_uploaded_file($image['tmp_name'], $imagePath);
         }
-        $statement = $pdo->prepare("INSERT INTO products (title, image, description, price, create_date)
-                    VALUES (:title, :image, :description, :price, :date)");
+        $statement = $pdo->prepare("UPDATE products SET title = :title, image = :image, description = :description,
+                                           price = :price WHERE id = :id");
         $statement->bindVAlue(':title', $title);
         $statement->bindVAlue(':image', $imagePath);
         $statement->bindVAlue(':description', $description);
         $statement->bindVAlue(':price', $price);
-        $statement->bindVAlue(':date', $date);
+        $statement->bindVAlue(':id', $id);
         $statement->execute();
         header('location: index.php');
     }
@@ -79,7 +91,10 @@ function randomString($n){
     <title>Bootstrap demo</title>
 </head>
 <body>
-<h1>Create New Product</h1>
+<p>
+    <a href="index.php" class="btn btn-secondary">Go back to products</a>
+</p>
+<h1>Update Product <b><?php echo $product['title'] ?></b></h1>
 <?php if(!empty($errors)): ?>
     <div class="alert alert-danger">
         <?php foreach ($errors as $error): ?>
@@ -88,6 +103,11 @@ function randomString($n){
     </div>
 <?php endif; ?>
 <form action="" method="post" enctype="multipart/form-data">
+
+    <?php if ($product['image']): ?>
+        <img src="<?php echo $product['image']; ?>" class="update-image">
+    <?php endif; ?>
+
     <div class="form-group">
         <label>Product Image</label>
         <br>
@@ -112,3 +132,5 @@ function randomString($n){
 
 </body>
 </html>
+
+
